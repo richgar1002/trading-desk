@@ -1,0 +1,53 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "ollama-cloud": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Ollama Cloud",
+      "options": {
+        "baseURL": "https://api.ollama.com/v1",
+        "headers": {
+          "Authorization": "Bearer ${OLLAMA_API_KEY}"
+        }
+      },
+      "models": {
+        "gemma-4": {
+          "name": "gemma3-27b-it:4b",
+          "limit": {
+            "context": 262144,
+            "output": 8192
+          }
+        },
+        "glm-5": {
+          "name": "glm-5:9b",
+          "limit": {
+            "context": 128000,
+            "output": 8192
+          }
+        },
+        "kimi-k2.5": {
+          "name": "kimi-k2.5:20b",
+          "limit": {
+            "context": 200000,
+            "output": 8192
+          }
+        },
+        "qwen-3": {
+          "name": "qwen3:14b",
+          "limit": {
+            "context": 128000,
+            "output": 8192
+          }
+        }
+      }
+    }
+  },
+  "agents": {
+    "trading": {
+      "name": "Trading Assistant",
+      "description": "Expert trading assistant for forex and futures using ICT methodology",
+      "model": "ollama-cloud:qwen-3",
+      "instructions": "You are an expert trading assistant for forex and futures markets using ICT methodology.\n            \nAvailable tools: execute_order, get_connection_status, analyze_order_flow, get_daily_bias, \nget_trade_setup, set_midnight_open, record_session_range, detect_fvg, check_sweeps, \nfull_trade_analysis, and more.\n\nAlways use risk management and verify orders before execution."
+    }
+  }
+}

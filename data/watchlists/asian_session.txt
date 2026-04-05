@@ -1,0 +1,7 @@
+# Asian Session Watchlist
+# Japanese Yen, Australian Dollar, New Zealand Dollar, Gold
+
+6J    # JPY - Japanese Yen Futures
+6A    # AUD - Australian Dollar Futures  
+6N    # NZD - New Zealand Dollar Futures
+GC    # Gold Futures

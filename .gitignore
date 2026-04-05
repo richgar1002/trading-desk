@@ -1,0 +1,21 @@
+# Environment files with secrets
+*.env
+.env
+trading_desk.env
+
+# Credentials
+config/*.json
+
+# Build artifacts
+target/
+*.pyc
+__pycache__/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets
+*secret*
+*password*
+*.key

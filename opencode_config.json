@@ -1,0 +1,64 @@
+{
+  "$schema": "https://opencode.ai/schema.json",
+  "name": "Trading Desk",
+  "description": "AI Trading Assistant with intelligent model routing",
+  "models": {
+    "defaults": {
+      "fast": "google/gemma-4-26b-a4b-it",
+      "complex": "minimax/minimax-m2.7",
+      "reasoning": "minimax/minimax-m2.7"
+    },
+    "providers": {
+      "openrouter": {
+        "api_key_env": "OPENROUTER_API_KEY",
+        "base_url": "https://openrouter.ai/api/v1"
+      }
+    }
+  },
+  "agents": {
+    "trading": {
+      "name": "Trading Assistant",
+      "model": "minimax/minimax-m2.7",
+      "instructions": "You are an expert trading assistant for forex and futures markets using ICT methodology.\n\nYour role is to:\n1. Analyze market conditions and provide trade setups\n2. Use order flow and session intelligence tools\n3. Execute trades via NinjaTrader 8 when appropriate\n4. Always consider risk management\n\nFor routine tasks (summaries, simple questions, pattern scans), use the fast model.\nFor complex analysis (multi-factor trade decisions, strategy development), use the complex model.",
+      "tools": [
+        "trading_tools"
+      ]
+    },
+    "research": {
+      "name": "Research Analyst",
+      "model": "minimax/minimax-m2.7",
+      "instructions": "You are a research analyst for trading. Analyze news, economic data, and market conditions.\nUse the fast model for news scanning, use the complex model for deep analysis.",
+      "tools": [
+        "trading_tools"
+      ]
+    },
+    "journal": {
+      "name": "Trade Journal Analyst",
+      "model": "google/gemma-4-26b-a4b-it",
+      "instructions": "You analyze trade journal entries and provide insights.\nUse simple, fast responses for routine journal reviews.",
+      "tools": [
+        "trading_tools"
+      ]
+    }
+  },
+  "routing": {
+    "task_complexity": {
+      "simple": [
+        "summarize",
+        "scan",
+        "check",
+        "list",
+        "status"
+      ],
+      "complex": [
+        "analyze",
+        "evaluate",
+        "debate",
+        "strategy",
+        "execute",
+        "trade"
+      ]
+    },
+    "auto_select": true
+  }
+}

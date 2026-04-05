@@ -1,0 +1,31 @@
+# News Keywords for Trading Desk
+# Used to curate news relevant to trading instruments
+
+# Forex Majors
+EUR USD GBP JPY AUD NZD CAD CHF
+Federal Reserve Fed Interest Rates
+DXY Dollar Index
+
+# Economic Data
+NFP Jobs Report CPI PPI GDP
+Retail Sales ISM PMI Consumer Confidence
+Interest Rate FOMC ECB BOE BOJ RBA RBNZ
+
+# Indices
+S&P 500 Dow Jones Nasdaq
+Stock Market Futures ES MNQ MYM
+
+# Treasuries/Bonds
+10Y Treasury 2Y Treasury Yield Curve
+ZN ZF Treasury Bonds T-Note
+
+# Commodities
+Oil Crude WTI Brent OPEC Natural Gas
+Gold Silver XAU XAG
+
+# Crypto
+Bitcoin Ethereum BTC ETH Crypto ETF
+
+# Risk Events
+Trump Tariffs Trade War China GDP
+G7 Fed Chair Powell Speech

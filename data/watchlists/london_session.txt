@@ -1,0 +1,11 @@
+# London Session Watchlist
+# Euro, British Pound, Yen, Gold, plus Indices
+
+6E    # EUR - Euro Futures
+6B    # GBP - British Pound Futures
+6J    # JPY - Japanese Yen Futures
+GC    # Gold Futures
+BZ    # Brent Crude
+MCL   # Crude Oil WTI
+MES   # S&P 500 E-mini
+MNQ   # Nasdaq 100 E-mini

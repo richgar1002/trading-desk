@@ -1,0 +1,13 @@
+# New York Session Watchlist
+# Indices, Treasuries, Energy, Metals
+
+MES   # S&P 500 E-mini
+MNQ   # Nasdaq 100 E-mini
+MYM   # Micro Dow Jones
+MCL   # Crude Oil WTI
+NG    # Natural Gas
+ZN    # 10-Year T-Note
+ZF    # 5-Year T-Note
+MGC   # Micro Gold Futures
+SI    # Silver Futures
+GC    # Gold Futures (continued)

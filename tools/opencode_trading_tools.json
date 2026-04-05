@@ -1,0 +1,325 @@
+{
+  "name": "TradingDesk",
+  "description": "AI Trading Desk - Execute trades, analyze order flow, and get ICT trade setups",
+  "version": "1.0.0",
+  "tools": [
+    {
+      "name": "execute_order",
+      "description": "Execute a trade order via NinjaTrader 8",
+      "category": "execution",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "description": "Trading symbol (ES, 6E, GC, CL, 6J, etc.)",
+            "examples": [
+              "ES",
+              "6E",
+              "GC",
+              "CL"
+            ]
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "BUY",
+              "SELL"
+            ],
+            "description": "Trade direction"
+          },
+          "quantity": {
+            "type": "integer",
+            "description": "Number of contracts",
+            "minimum": 1
+          },
+          "order_type": {
+            "type": "string",
+            "enum": [
+              "MARKET",
+              "LIMIT",
+              "STOP"
+            ],
+            "default": "MARKET",
+            "description": "Order type"
+          },
+          "price": {
+            "type": "number",
+            "description": "Limit price (required for LIMIT orders)"
+          },
+          "stop_price": {
+            "type": "number",
+            "description": "Stop loss price"
+          },
+          "target_price": {
+            "type": "number",
+            "description": "Take profit price"
+          }
+        },
+        "required": [
+          "symbol",
+          "action",
+          "quantity"
+        ]
+      }
+    },
+    {
+      "name": "get_connection_status",
+      "description": "Check connection status to NinjaTrader 8",
+      "category": "execution",
+      "input_schema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "analyze_order_flow",
+      "description": "Analyze a price tick for order flow signals (delta, absorption, institutional activity)",
+      "category": "orderflow",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "price": {
+            "type": "number",
+            "description": "Current price"
+          },
+          "volume": {
+            "type": "integer",
+            "description": "Tick volume"
+          },
+          "bid": {
+            "type": "number",
+            "description": "Current bid"
+          },
+          "ask": {
+            "type": "number",
+            "description": "Current ask"
+          }
+        },
+        "required": [
+          "price",
+          "volume",
+          "bid",
+          "ask"
+        ]
+      }
+    },
+    {
+      "name": "get_order_flow_summary",
+      "description": "Get summary of current order flow analysis",
+      "category": "orderflow",
+      "input_schema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "get_daily_bias",
+      "description": "Get daily bias based on ICT methodology (midnight open, session ranges)",
+      "category": "session",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "current_price": {
+            "type": "number",
+            "description": "Current market price"
+          }
+        },
+        "required": [
+          "current_price"
+        ]
+      }
+    },
+    {
+      "name": "get_trade_setup",
+      "description": "Get ICT trade setup with entry, stop, target, and invalidation levels",
+      "category": "session",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "current_price": {
+            "type": "number"
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "long",
+              "short"
+            ]
+          }
+        },
+        "required": [
+          "current_price",
+          "direction"
+        ]
+      }
+    },
+    {
+      "name": "set_midnight_open",
+      "description": "Set midnight opening price for ICT analysis",
+      "category": "session",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "price": {
+            "type": "number",
+            "description": "Midnight open price"
+          }
+        },
+        "required": [
+          "price"
+        ]
+      }
+    },
+    {
+      "name": "record_session_range",
+      "description": "Record a trading session's high/low range (Asian, London, NY)",
+      "category": "session",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "session": {
+            "type": "string",
+            "enum": [
+              "ASIAN",
+              "LONDON",
+              "NEW_YORK"
+            ]
+          },
+          "high": {
+            "type": "number"
+          },
+          "low": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "session",
+          "high",
+          "low"
+        ]
+      }
+    },
+    {
+      "name": "add_liquidity_zone",
+      "description": "Add a liquidity zone for sweep detection",
+      "category": "session",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "level": {
+            "type": "number"
+          },
+          "zone_type": {
+            "type": "string",
+            "enum": [
+              "buy_stop",
+              "sell_stop",
+              "accumulation",
+              "distribution"
+            ]
+          }
+        },
+        "required": [
+          "level",
+          "zone_type"
+        ]
+      }
+    },
+    {
+      "name": "detect_fvg",
+      "description": "Detect Fair Value Gap from 3 candles",
+      "category": "session",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "candle1_low": {
+            "type": "number"
+          },
+          "candle1_high": {
+            "type": "number"
+          },
+          "candle2_low": {
+            "type": "number"
+          },
+          "candle2_high": {
+            "type": "number"
+          },
+          "candle3_low": {
+            "type": "number"
+          },
+          "candle3_high": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "candle1_low",
+          "candle1_high",
+          "candle2_low",
+          "candle2_high",
+          "candle3_low",
+          "candle3_high"
+        ]
+      }
+    },
+    {
+      "name": "check_sweeps",
+      "description": "Check for liquidity sweeps and FVG fills at current price",
+      "category": "session",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "current_price": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "current_price"
+        ]
+      }
+    },
+    {
+      "name": "full_trade_analysis",
+      "description": "Complete trade analysis combining order flow, daily bias, and levels",
+      "category": "analysis",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string"
+          },
+          "current_price": {
+            "type": "number"
+          },
+          "bid": {
+            "type": "number"
+          },
+          "ask": {
+            "type": "number"
+          },
+          "session_high": {
+            "type": "number"
+          },
+          "session_low": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "symbol",
+          "current_price",
+          "bid",
+          "ask"
+        ]
+      }
+    },
+    {
+      "name": "get_current_session",
+      "description": "Get current trading session (Asian, London, NY)",
+      "category": "session",
+      "input_schema": {
+        "type": "object",
+        "properties": {}
+      }
+    }
+  ]
+}

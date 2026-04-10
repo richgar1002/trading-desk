@@ -13,7 +13,7 @@ import sqlite3
 from urllib.parse import urlparse, parse_qs
 from datetime import datetime
 
-PORT = 8099
+PORT = 8100
 DB_PATH = "/tmp/trading-desk/database/orderflow.db"
 WWW_DIR = "/tmp/trading-desk/dashboard"
 
@@ -27,7 +27,7 @@ class OrderflowHandler(http.server.SimpleHTTPRequestHandler):
         path = parsed.path
         
         if path == '/' or path == '/index.html':
-            self.serve_file('/exhaustion_dashboard.html')
+            self.serve_file('/index.html')
         elif path.startswith('/api/'):
             self.handle_api(path)
         else:

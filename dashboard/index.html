@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Orderflow Trading Desk</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        :root {
+            --bg-primary: #0a0a0f;
+            --bg-secondary: #12121a;
+            --bg-tertiary: #1a1a25;
+            --text-primary: #e0e0e0;
+            --text-secondary: #888;
+            --text-muted: #555;
+            --accent: #00d4ff;
+            --bull: #00ff88;
+            --bear: #ff4444;
+            --warning: #ffaa00;
+            --border: #222;
+        }
+        
+        body {
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, var(--bg-primary) 0%, #1a1a2e 100%);
+            color: var(--text-primary);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        .header h1 {
+            color: var(--accent);
+            font-size: 24px;
+        }
+        
+        .header .time span {
+            color: var(--bull);
+            font-size: 18px;
+            font-weight: bold;
+        }
+        
+        .symbol-bar {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            align-items: center;
+        }
+        
+        .symbol-select {
+            padding: 10px 20px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 14px;
+            cursor: pointer;
+        }
+        
+        .symbol-select:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+        
+        .tf-select {
+            padding: 10px 15px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 14px;
+            cursor: pointer;
+        }
+        
+        .status-badge {
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        
+        .status-badge.connected {
+            background: rgba(0, 255, 136, 0.2);
+            color: var(--bull);
+            border: 1px solid var(--bull);
+        }
+        
+        .status-badge.loading {
+            background: rgba(255, 170, 0, 0.2);
+            color: var(--warning);
+            border: 1px solid var(--warning);
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+        }
+        
+        .agent-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 15px;
+            transition: all 0.3s ease;
+        }
+        
+        .agent-card:hover {
+            border-color: var(--accent);
+            transform: translateY(-2px);
+        }
+        
+        .agent-card.signal-high {
+            border-color: var(--bear);
+            box-shadow: 0 0 20px rgba(255, 68, 68, 0.2);
+        }
+        
+        .agent-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        
+        .agent-name {
+            font-size: 13px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-secondary);
+        }
+        
+        .agent-badge {
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 10px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        
+        .agent-badge.bull {
+            background: rgba(0, 255, 136, 0.2);
+            color: var(--bull);
+        }
+        
+        .agent-badge.bear {
+            background: rgba(255, 68, 68, 0.2);
+            color: var(--bear);
+        }
+        
+        .agent-badge.neutral {
+            background: rgba(136, 136, 136, 0.2);
+            color: var(--text-secondary);
+        }
+        
+        .score-display {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 10px;
+        }
+        
+        .score-circle {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            border: 3px solid;
+            flex-shrink: 0;
+        }
+        
+        .score-circle.low { border-color: var(--bull); background: rgba(0, 255, 136, 0.1); }
+        .score-circle.moderate { border-color: var(--warning); background: rgba(255, 170, 0, 0.1); }
+        .score-circle.high { border-color: var(--bear); background: rgba(255, 68, 68, 0.1); }
+        
+        .score-value {
+            font-size: 24px;
+            font-weight: bold;
+        }
+        
+        .score-circle.low .score-value { color: var(--bull); }
+        .score-circle.moderate .score-value { color: var(--warning); }
+        .score-circle.high .score-value { color: var(--bear); }
+        
+        .score-label {
+            font-size: 9px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+        
+        .interpretation {
+            font-size: 12px;
+            color: var(--text-secondary);
+            line-height: 1.4;
+        }
+        
+        .components {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid var(--border);
+        }
+        
+        .component-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 10px;
+            margin-bottom: 4px;
+        }
+        
+        .component-name { color: var(--text-muted); }
+        .component-value { color: var(--text-secondary); }
+        
+        .component-bar {
+            height: 4px;
+            background: var(--bg-tertiary);
+            border-radius: 2px;
+            margin-bottom: 6px;
+            overflow: hidden;
+        }
+        
+        .component-fill {
+            height: 100%;
+            border-radius: 2px;
+            transition: width 0.3s ease;
+        }
+        
+        .component-fill.low { background: var(--bull); }
+        .component-fill.moderate { background: var(--warning); }
+        .component-fill.high { background: var(--bear); }
+        
+        /* Summary Section */
+        .summary {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+        
+        .summary h2 {
+            font-size: 14px;
+            color: var(--accent);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 15px;
+        }
+        
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+        }
+        
+        .summary-item {
+            text-align: center;
+            padding: 15px;
+            background: var(--bg-tertiary);
+            border-radius: 8px;
+        }
+        
+        .summary-value {
+            font-size: 28px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .summary-value.bull { color: var(--bull); }
+        .summary-value.bear { color: var(--bear); }
+        .summary-value.warning { color: var(--warning); }
+        
+        .summary-label {
+            font-size: 11px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+        
+        /* Market Bias */
+        .market-bias {
+            margin-top: 20px;
+            padding: 20px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+        }
+        
+        .bias-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .bias-title {
+            font-size: 14px;
+            color: var(--accent);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .bias-indicator {
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 14px;
+        }
+        
+        .bias-indicator.bull {
+            background: rgba(0, 255, 136, 0.2);
+            color: var(--bull);
+            border: 2px solid var(--bull);
+        }
+        
+        .bias-indicator.bear {
+            background: rgba(255, 68, 68, 0.2);
+            color: var(--bear);
+            border: 2px solid var(--bear);
+        }
+        
+        .bias-indicator.neutral {
+            background: rgba(136, 136, 136, 0.2);
+            color: var(--text-secondary);
+            border: 2px solid var(--text-secondary);
+        }
+        
+        /* Agents Grid - 3x3 */
+        .agents-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+        }
+        
+        /* Responsive */
+        @media (max-width: 1200px) {
+            .grid, .agents-grid { grid-template-columns: repeat(2, 1fr); }
+            .summary-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+        
+        @media (max-width: 768px) {
+            .grid, .agents-grid { grid-template-columns: 1fr; }
+            .summary-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+        
+        /* Last updated */
+        .last-updated {
+            text-align: center;
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 20px;
+        }
+        
+        /* Quick stats row */
+        .quick-stats {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .stat-item {
+            flex: 1;
+            padding: 15px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 20px;
+            font-weight: bold;
+            color: var(--accent);
+        }
+        
+        .stat-label {
+            font-size: 10px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            margin-top: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Orderflow Trading Desk</h1>
+        <div class="time">
+            <span id="clock"></span>
+        </div>
+    </div>
+    
+    <div class="symbol-bar">
+        <select class="symbol-select" id="symbol">
+            <option value="ES">ES (E-mini S&P 500)</option>
+            <option value="NQ">NQ (E-mini NASDAQ)</option>
+            <option value="CL">CL (Crude Oil)</option>
+            <option value="GC">GC (Gold)</option>
+        </select>
+        <select class="tf-select" id="timeframe">
+            <option value="1min">1 Min</option>
+            <option value="5min">5 Min</option>
+            <option value="15min">15 Min</option>
+        </select>
+        <span class="status-badge loading" id="status">Loading...</span>
+    </div>
+    
+    <div class="quick-stats">
+        <div class="stat-item">
+            <div class="stat-value" id="bar-count">--</div>
+            <div class="stat-label">Bars Loaded</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-value" id="latest-time">--</div>
+            <div class="stat-label">Latest Bar</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-value" id="alert-count">0</div>
+            <div class="stat-label">Active Alerts</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-value" id="session">ASIAN</div>
+            <div class="stat-label">Current Session</div>
+        </div>
+    </div>
+    
+    <div class="market-bias">
+        <div class="bias-header">
+            <span class="bias-title">Market Bias</span>
+            <span class="bias-indicator neutral" id="market-bias">CALCULATING...</span>
+        </div>
+        <div class="summary-grid">
+            <div class="summary-item">
+                <div class="summary-value bull" id="bull-pressure">--</div>
+                <div class="summary-label">Bull Pressure</div>
+            </div>
+            <div class="summary-item">
+                <div class="summary-value bear" id="bear-pressure">--</div>
+                <div class="summary-label">Bear Pressure</div>
+            </div>
+            <div class="summary-item">
+                <div class="summary-value warning" id="avg-exhaustion">--</div>
+                <div class="summary-label">Avg Exhaustion</div>
+            </div>
+            <div class="summary-item">
+                <div class="summary-value" id="trend-strength" style="color: var(--accent)">--</div>
+                <div class="summary-label">Trend Strength</div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="summary">
+        <h2>Signal Agents</h2>
+        <div class="agents-grid" id="agents-grid">
+            <!-- Agent cards injected here -->
+        </div>
+    </div>
+    
+    <div class="last-updated" id="last-updated">
+        Last updated: --
+    </div>
+    
+    <script>
+        // Clock
+        function updateClock() {
+            const now = new Date();
+            document.getElementById('clock').textContent = now.toLocaleTimeString('en-US', {
+                hour: '2-digit', minute: '2-digit', second: '2-digit'
+            });
+        }
+        updateClock();
+        setInterval(updateClock, 1000);
+        
+        // State
+        const state = {
+            symbol: 'ES',
+            timeframe: '1min',
+            agents: ['exhaustion', 'absorption', 'volume', 'delta', 'liquidity', 'trend', 'vwap', 'volume_profile', 'footprint'],
+            agentData: {},
+            refreshInterval: 5000
+        };
+        
+        // Color helpers
+        function getScoreClass(score) {
+            if (score === undefined || score === null) return 'low';
+            if (score >= 0.6) return 'high';
+            if (score >= 0.4) return 'moderate';
+            return 'low';
+        }
+        
+        function getDirectionClass(dir) {
+            if (!dir) return 'neutral';
+            const d = dir.toUpperCase();
+            if (d.includes('BUY') || d.includes('BULL') || d.includes('ABOVE')) return 'bull';
+            if (d.includes('SELL') || d.includes('BEAR') || d.includes('BELOW')) return 'bear';
+            return 'neutral';
+        }
+        
+        // Render agent card
+        function renderAgentCard(name, data) {
+            if (!data || !data.latest) {
+                return `
+                    <div class="agent-card">
+                        <div class="agent-header">
+                            <span class="agent-name">${name}</span>
+                        </div>
+                        <div style="text-align: center; padding: 20px; color: var(--text-muted);">
+                            No data
+                        </div>
+                    </div>
+                `;
+            }
+            
+            const latest = data.latest;
+            const score = latest.score !== undefined ? latest.score : 0;
+            const scoreClass = getScoreClass(score);
+            const dirClass = getDirectionClass(latest.direction || latest.direction);
+            
+            // Build components HTML
+            let componentsHtml = '';
+            if (latest.components) {
+                for (const [key, val] of Object.entries(latest.components)) {
+                    const compClass = getScoreClass(val);
+                    componentsHtml += `
+                        <div class="component-row">
+                            <span class="component-name">${key.replace(/_/g, ' ')}</span>
+                            <span class="component-value">${typeof val === 'number' ? val.toFixed(2) : val}</span>
+                        </div>
+                        <div class="component-bar">
+                            <div class="component-fill ${compClass}" style="width: ${Math.min(100, val * 100)}%"></div>
+                        </div>
+                    `;
+                }
+            }
+            
+            // Special handling for different agent types
+            let extraInfo = '';
+            if (name === 'vwap' && latest.vwap) {
+                extraInfo = `<div style="font-size: 11px; color: var(--text-muted); margin-top: 5px;">
+                    VWAP: ${latest.vwap} | Dev: ${latest.deviation_points} pts
+                </div>`;
+            }
+            if (name === 'volume_profile' && latest.poc) {
+                extraInfo = `<div style="font-size: 11px; color: var(--text-muted); margin-top: 5px;">
+                    POC: ${latest.poc} | VAL: ${latest.val} | VAH: ${latest.vah}
+                </div>`;
+            }
+            if (name === 'footprint' && latest.imbalance !== undefined) {
+                extraInfo = `<div style="font-size: 11px; color: var(--text-muted); margin-top: 5px;">
+                    MaxVol: ${latest.max_volume_level} | ${latest.imbalance_direction}
+                </div>`;
+            }
+            
+            const interp = latest.interpretation || 'No signal';
+            const signalClass = score >= 0.6 ? 'signal-high' : '';
+            
+            return `
+                <div class="agent-card ${signalClass}">
+                    <div class="agent-header">
+                        <span class="agent-name">${name.replace(/_/g, ' ')}</span>
+                        <span class="agent-badge ${dirClass}">${latest.direction || 'NEUTRAL'}</span>
+                    </div>
+                    <div class="score-display">
+                        <div class="score-circle ${scoreClass}">
+                            <div class="score-value">${score.toFixed(2)}</div>
+                            <div class="score-label">Score</div>
+                        </div>
+                        <div class="interpretation">${interp}</div>
+                    </div>
+                    ${extraInfo}
+                    <div class="components">
+                        ${componentsHtml}
+                    </div>
+                </div>
+            `;
+        }
+        
+        // Fetch agent data
+        async function fetchAgent(agentName) {
+            try {
+                const resp = await fetch(`/api/${agentName}?symbol=${state.symbol}&timeframe=${state.timeframe}`);
+                return await resp.json();
+            } catch (e) {
+                console.error(`Error fetching ${agentName}:`, e);
+                return { bar_count: 0, latest: null };
+            }
+        }
+        
+        // Update all agents
+        async function updateAllAgents() {
+            document.getElementById('status').textContent = 'Loading...';
+            document.getElementById('status').className = 'status-badge loading';
+            
+            const promises = state.agents.map(agent => fetchAgent(agent));
+            const results = await Promise.all(promises);
+            
+            results.forEach((data, i) => {
+                state.agentData[state.agents[i]] = data;
+            });
+            
+            renderDashboard();
+            
+            document.getElementById('status').textContent = 'Live';
+            document.getElementById('status').className = 'status-badge connected';
+            document.getElementById('last-updated').textContent = 
+                'Last updated: ' + new Date().toLocaleTimeString();
+        }
+        
+        // Render dashboard
+        function renderDashboard() {
+            const grid = document.getElementById('agents-grid');
+            let html = '';
+            
+            state.agents.forEach(agent => {
+                html += renderAgentCard(agent, state.agentData[agent]);
+            });
+            
+            grid.innerHTML = html;
+            
+            // Update summary stats
+            updateSummary();
+        }
+        
+        // Update summary section
+        function updateSummary() {
+            // Find latest bar time across all agents
+            let latestTime = null;
+            let totalExhaustion = 0;
+            let exhaustionCount = 0;
+            let bullCount = 0;
+            let bearCount = 0;
+            let alertCount = 0;
+            
+            for (const [name, data] of Object.entries(state.agentData)) {
+                if (data && data.latest && data.latest.bar_time) {
+                    if (!latestTime || data.latest.bar_time > latestTime) {
+                        latestTime = data.latest.bar_time;
+                    }
+                }
+                
+                if (data && data.latest) {
+                    const score = data.latest.score || 0;
+                    if (score >= 0.6) alertCount++;
+                    
+                    if (name === 'exhaustion') {
+                        totalExhaustion += score;
+                        exhaustionCount++;
+                    }
+                    
+                    const dir = (data.latest.direction || '').toUpperCase();
+                    if (dir.includes('BUY') || dir.includes('BULL')) bullCount++;
+                    if (dir.includes('SELL') || dir.includes('BEAR')) bearCount++;
+                }
+            }
+            
+            document.getElementById('bar-count').textContent = 
+                (state.agentData.exhaustion?.bar_count || 0).toLocaleString();
+            document.getElementById('latest-time').textContent = 
+                latestTime ? latestTime.split(' ')[1] || latestTime : '--';
+            document.getElementById('alert-count').textContent = alertCount;
+            
+            // Calculate averages
+            const avgExhaustion = exhaustionCount > 0 ? (totalExhaustion / exhaustionCount).toFixed(2) : '--';
+            document.getElementById('avg-exhaustion').textContent = avgExhaustion;
+            
+            document.getElementById('bull-pressure').textContent = bullCount;
+            document.getElementById('bear-pressure').textContent = bearCount;
+            
+            // Market bias
+            const bias = document.getElementById('market-bias');
+            if (bullCount > bearCount + 2) {
+                bias.textContent = 'BULLISH';
+                bias.className = 'bias-indicator bull';
+            } else if (bearCount > bullCount + 2) {
+                bias.textContent = 'BEARISH';
+                bias.className = 'bias-indicator bear';
+            } else {
+                bias.textContent = 'NEUTRAL';
+                bias.className = 'bias-indicator neutral';
+            }
+            
+            // Trend strength
+            const trend = state.agentData.trend?.latest?.score || 0;
+            document.getElementById('trend-strength').textContent = trend.toFixed(2);
+        }
+        
+        // Event listeners
+        document.getElementById('symbol').addEventListener('change', (e) => {
+            state.symbol = e.target.value;
+            updateAllAgents();
+        });
+        
+        document.getElementById('timeframe').addEventListener('change', (e) => {
+            state.timeframe = e.target.value;
+            updateAllAgents();
+        });
+        
+        // Initialize
+        updateAllAgents();
+        setInterval(updateAllAgents, state.refreshInterval);
+    </script>
+</body>
+</html>

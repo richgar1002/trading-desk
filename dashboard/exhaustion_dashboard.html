@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Orderflow Dashboard - Exhaustion Agent</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #0a0a0f 0%, #1a1a2e 100%);
+            color: #e0e0e0;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #333;
+        }
+        
+        .header h1 {
+            color: #00d4ff;
+            font-size: 24px;
+        }
+        
+        .header .time {
+            text-align: right;
+        }
+        
+        .header .time span {
+            color: #00ff88;
+            font-size: 18px;
+            font-weight: bold;
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            gap: 20px;
+        }
+        
+        .panel {
+            background: #12121a;
+            border: 1px solid #222;
+            border-radius: 10px;
+            padding: 20px;
+        }
+        
+        .panel h2 {
+            color: #00d4ff;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 15px;
+        }
+        
+        /* Current Score Display */
+        .current-score {
+            text-align: center;
+            padding: 30px 20px;
+        }
+        
+        .score-circle {
+            width: 150px;
+            height: 150px;
+            border-radius: 50%;
+            margin: 0 auto 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            border: 4px solid;
+            transition: all 0.3s ease;
+        }
+        
+        .score-circle.low {
+            border-color: #44bb44;
+            background: rgba(68, 187, 68, 0.1);
+        }
+        
+        .score-circle.moderate {
+            border-color: #ffaa00;
+            background: rgba(255, 170, 0, 0.1);
+        }
+        
+        .score-circle.high {
+            border-color: #ff4444;
+            background: rgba(255, 68, 68, 0.1);
+        }
+        
+        .score-value {
+            font-size: 48px;
+            font-weight: bold;
+        }
+        
+        .score-circle.low .score-value { color: #44bb44; }
+        .score-circle.moderate .score-value { color: #ffaa00; }
+        .score-circle.high .score-value { color: #ff4444; }
+        
+        .score-label {
+            font-size: 12px;
+            color: #888;
+            text-transform: uppercase;
+        }
+        
+        .interpretation {
+            font-size: 16px;
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 8px;
+        }
+        
+        .interpretation.low {
+            background: rgba(68, 187, 68, 0.2);
+            color: #44bb44;
+        }
+        
+        .interpretation.moderate {
+            background: rgba(255, 170, 0, 0.2);
+            color: #ffaa00;
+        }
+        
+        .interpretation.high {
+            background: rgba(255, 68, 68, 0.2);
+            color: #ff4444;
+        }
+        
+        /* Components */
+        .components {
+            margin-top: 20px;
+        }
+        
+        .component {
+            margin-bottom: 12px;
+        }
+        
+        .component-header {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            margin-bottom: 4px;
+        }
+        
+        .component-name {
+            color: #888;
+        }
+        
+        .component-value {
+            color: #fff;
+        }
+        
+        .component-bar {
+            height: 6px;
+            background: #1a1a25;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+        
+        .component-fill {
+            height: 100%;
+            border-radius: 3px;
+            transition: width 0.3s ease;
+        }
+        
+        .component-fill.low { background: #44bb44; }
+        .component-fill.moderate { background: #ffaa00; }
+        .component-fill.high { background: #ff4444; }
+        
+        /* Chart */
+        .chart-container {
+            height: 400px;
+            position: relative;
+        }
+        
+        .chart-placeholder {
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #555;
+            font-size: 14px;
+        }
+        
+        /* Alert */
+        .alert {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 25px;
+            border-radius: 10px;
+            font-weight: bold;
+            animation: pulse 1s infinite;
+            z-index: 1000;
+            display: none;
+        }
+        
+        .alert.show {
+            display: block;
+        }
+        
+        .alert.warning {
+            background: linear-gradient(135deg, #ff4444 0%, #cc0000 100%);
+            color: white;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+        
+        /* Status */
+        .status {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        
+        .status-item {
+            flex: 1;
+            text-align: center;
+            padding: 10px;
+            background: #1a1a25;
+            border-radius: 8px;
+        }
+        
+        .status-label {
+            font-size: 10px;
+            color: #666;
+            text-transform: uppercase;
+        }
+        
+        .status-value {
+            font-size: 14px;
+            margin-top: 4px;
+        }
+        
+        /* Last updated */
+        .last-updated {
+            text-align: center;
+            font-size: 11px;
+            color: #555;
+            margin-top: 15px;
+        }
+        
+        /* Symbol selector */
+        .symbol-select {
+            width: 100%;
+            padding: 10px;
+            background: #1a1a25;
+            border: 1px solid #333;
+            border-radius: 8px;
+            color: #fff;
+            font-size: 14px;
+            margin-bottom: 15px;
+        }
+        
+        /* Instructions */
+        .instructions {
+            font-size: 12px;
+            color: #666;
+            line-height: 1.6;
+            margin-top: 15px;
+            padding: 15px;
+            background: #0a0a0f;
+            border-radius: 8px;
+        }
+        
+        .instructions h3 {
+            color: #888;
+            margin-bottom: 8px;
+            font-size: 12px;
+        }
+        
+        .instructions code {
+            background: #1a1a25;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 11px;
+        }
+    </style>
+</head>
+<body>
+    <div class="alert warning" id="alert">
+        ⚠️ EXHAUSTION ALERT
+    </div>
+    
+    <div class="header">
+        <h1>Orderflow Dashboard</h1>
+        <div class="time">
+            <div id="date"></div>
+            <span id="clock"></span>
+        </div>
+    </div>
+    
+    <div class="grid">
+        <div class="left">
+            <div class="panel">
+                <h2>Exhaustion Agent</h2>
+                
+                <select class="symbol-select" id="symbol">
+                    <option value="ES">ES (E-mini S&P 500)</option>
+                    <option value="NQ">NQ (E-mini NASDAQ)</option>
+                    <option value="CL">CL (Crude Oil)</option>
+                    <option value="GC">GC (Gold)</option>
+                </select>
+                
+                <div class="status">
+                    <div class="status-item">
+                        <div class="status-label">Symbol</div>
+                        <div class="status-value" id="current-symbol">ES</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-label">Timeframe</div>
+                        <div class="status-value" id="current-tf">5min</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-label">Bars</div>
+                        <div class="status-value" id="bar-count">0</div>
+                    </div>
+                </div>
+                
+                <div class="current-score">
+                    <div class="score-circle low" id="score-circle">
+                        <div class="score-value" id="score-value">--</div>
+                        <div class="score-label">Score</div>
+                    </div>
+                    <div class="interpretation low" id="interpretation">
+                        No data - Import CSV first
+                    </div>
+                </div>
+                
+                <div class="components" id="components">
+                    <div class="component">
+                        <div class="component-header">
+                            <span class="component-name">Delta Divergence</span>
+                            <span class="component-value" id="comp-delta">--</span>
+                        </div>
+                        <div class="component-bar">
+                            <div class="component-fill low" id="bar-delta" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <div class="component">
+                        <div class="component-header">
+                            <span class="component-name">Volume/Movement</span>
+                            <span class="component-value" id="comp-vol">--</span>
+                        </div>
+                        <div class="component-bar">
+                            <div class="component-fill low" id="bar-vol" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <div class="component">
+                        <div class="component-header">
+                            <span class="component-name">Lingering</span>
+                            <span class="component-value" id="comp-linger">--</span>
+                        </div>
+                        <div class="component-bar">
+                            <div class="component-fill low" id="bar-linger" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <div class="component">
+                        <div class="component-header">
+                            <span class="component-name">Delta Fade</span>
+                            <span class="component-value" id="comp-fade">--</span>
+                        </div>
+                        <div class="component-bar">
+                            <div class="component-fill low" id="bar-fade" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="last-updated" id="last-updated">
+                    Last updated: --
+                </div>
+                
+                <div class="instructions">
+                    <h3>How to Import Data</h3>
+                    <p>1. Export orderflow from NinjaTrader as CSV</p>
+                    <p>2. Upload to VPS: <code>scp file.csv user@vps:/tmp/trading-desk/data/</code></p>
+                    <p>3. Import: <code>python3 csv_importer.py file.csv --symbol ES</code></p>
+                    <p>4. Refresh this dashboard</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="right">
+            <div class="panel">
+                <h2>Exhaustion History</h2>
+                <div class="chart-container">
+                    <div class="chart-placeholder" id="chart-placeholder">
+                        Import data to see exhaustion chart.<br>
+                        Use the importer to load NinjaTrader CSV.
+                    </div>
+                    <canvas id="chart" style="display: none; width: 100%; height: 100%;"></canvas>
+                </div>
+            </div>
+            
+            <div class="panel" style="margin-top: 20px;">
+                <h2>Recent Scores</h2>
+                <div id="recent-scores" style="font-size: 12px; color: #888;">
+                    No data yet
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Clock
+        function updateClock() {
+            const now = new Date();
+            document.getElementById('date').textContent = now.toLocaleDateString('en-US', {
+                weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+            });
+            document.getElementById('clock').textContent = now.toLocaleTimeString('en-US', {
+                hour: '2-digit', minute: '2-digit', second: '2-digit'
+            });
+        }
+        updateClock();
+        setInterval(updateClock, 1000);
+        
+        // Dashboard state
+        let state = {
+            symbol: 'ES',
+            timeframe: '5min',
+            latestScore: null,
+            history: [],
+            alertThreshold: 0.7,
+            refreshInterval: 10000 // 10 seconds
+        };
+        
+        // Color helper
+        function getScoreClass(score) {
+            if (score >= 0.6) return 'high';
+            if (score >= 0.4) return 'moderate';
+            return 'low';
+        }
+        
+        // Update UI
+        function updateUI(data) {
+            if (!data) return;
+            
+            // Update symbol display
+            document.getElementById('current-symbol').textContent = state.symbol;
+            document.getElementById('current-tf').textContent = state.timeframe;
+            document.getElementById('bar-count').textContent = data.bar_count || state.history.length;
+            
+            // Latest score
+            if (data.latest) {
+                const score = data.latest.score;
+                const cls = getScoreClass(score);
+                
+                document.getElementById('score-value').textContent = score.toFixed(2);
+                document.getElementById('score-circle').className = 'score-circle ' + cls;
+                
+                const interp = document.getElementById('interpretation');
+                interp.textContent = data.latest.interpretation || 'Analyzing...';
+                interp.className = 'interpretation ' + cls;
+                
+                // Components
+                const comps = data.latest.components || {};
+                for (const [key, val] of Object.entries(comps)) {
+                    const el = document.getElementById('comp-' + key);
+                    const bar = document.getElementById('bar-' + key);
+                    if (el) el.textContent = val.toFixed(2);
+                    if (bar) {
+                        bar.style.width = (val * 100) + '%';
+                        bar.className = 'component-fill ' + getScoreClass(val);
+                    }
+                }
+                
+                // Alert
+                const alert = document.getElementById('alert');
+                if (score >= state.alertThreshold) {
+                    alert.classList.add('show');
+                    setTimeout(() => alert.classList.remove('show'), 5000);
+                }
+                
+                document.getElementById('last-updated').textContent = 
+                    'Last updated: ' + new Date().toLocaleTimeString();
+            }
+            
+            // History
+            if (data.history) {
+                state.history = data.history;
+                renderChart();
+                renderRecentScores();
+            }
+        }
+        
+        // Render mini chart
+        function renderChart() {
+            const canvas = document.getElementById('chart');
+            const placeholder = document.getElementById('chart-placeholder');
+            
+            if (state.history.length === 0) {
+                canvas.style.display = 'none';
+                placeholder.style.display = 'flex';
+                return;
+            }
+            
+            canvas.style.display = 'block';
+            placeholder.style.display = 'none';
+            
+            const ctx = canvas.getContext('2d');
+            const rect = canvas.parentElement.getBoundingClientRect();
+            canvas.width = rect.width;
+            canvas.height = rect.height;
+            
+            const history = state.history.slice(-50); // Last 50 bars
+            const padding = { top: 20, right: 20, bottom: 30, left: 50 };
+            const chartWidth = canvas.width - padding.left - padding.right;
+            const chartHeight = canvas.height - padding.top - padding.bottom;
+            
+            // Clear
+            ctx.fillStyle = '#12121a';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw grid
+            ctx.strokeStyle = '#1a1a25';
+            ctx.lineWidth = 1;
+            for (let i = 0; i <= 4; i++) {
+                const y = padding.top + (chartHeight / 4) * i;
+                ctx.beginPath();
+                ctx.moveTo(padding.left, y);
+                ctx.lineTo(canvas.width - padding.right, y);
+                ctx.stroke();
+            }
+            
+            // Y-axis labels
+            ctx.fillStyle = '#555';
+            ctx.font = '10px Segoe UI';
+            ctx.textAlign = 'right';
+            ctx.fillText('1.0', padding.left - 5, padding.top + 10);
+            ctx.fillText('0.5', padding.left - 5, padding.top + chartHeight / 2 + 10);
+            ctx.fillText('0.0', padding.left - 5, padding.top + chartHeight + 10);
+            
+            // Draw threshold line
+            ctx.strokeStyle = '#ff4444';
+            ctx.setLineDash([5, 5]);
+            const thresholdY = padding.top + chartHeight * (1 - state.alertThreshold);
+            ctx.beginPath();
+            ctx.moveTo(padding.left, thresholdY);
+            ctx.lineTo(canvas.width - padding.right, thresholdY);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            
+            // Draw exhaustion line
+            ctx.strokeStyle = '#ff4444';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            
+            history.forEach((bar, i) => {
+                const x = padding.left + (i / (history.length - 1)) * chartWidth;
+                const y = padding.top + chartHeight * (1 - bar.score);
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            });
+            ctx.stroke();
+            
+            // Fill under line
+            ctx.lineTo(padding.left + chartWidth, padding.top + chartHeight);
+            ctx.lineTo(padding.left, padding.top + chartHeight);
+            ctx.closePath();
+            ctx.fillStyle = 'rgba(255, 68, 68, 0.1)';
+            ctx.fill();
+            
+            // Draw points
+            history.forEach((bar, i) => {
+                if (bar.score >= state.alertThreshold) {
+                    const x = padding.left + (i / (history.length - 1)) * chartWidth;
+                    const y = padding.top + chartHeight * (1 - bar.score);
+                    ctx.beginPath();
+                    ctx.arc(x, y, 4, 0, Math.PI * 2);
+                    ctx.fillStyle = '#ff4444';
+                    ctx.fill();
+                }
+            });
+        }
+        
+        // Render recent scores list
+        function renderRecentScores() {
+            const el = document.getElementById('recent-scores');
+            const history = state.history.slice(-10).reverse();
+            
+            if (history.length === 0) {
+                el.innerHTML = 'No data yet';
+                return;
+            }
+            
+            let html = '<table style="width: 100%; border-collapse: collapse;">';
+            html += '<tr style="color: #555; font-size: 10px;"><td>Time</td><td>Score</td><td>Signal</td></tr>';
+            
+            history.forEach(bar => {
+                const cls = getScoreClass(bar.score);
+                const time = bar.bar_time ? bar.bar_time.split(' ')[1] || bar.bar_time : '--';
+                html += `<tr style="border-bottom: 1px solid #1a1a25;">
+                    <td style="padding: 6px 0;">${time}</td>
+                    <td style="color: ${cls === 'high' ? '#ff4444' : cls === 'moderate' ? '#ffaa00' : '#44bb44'};">
+                        ${bar.score.toFixed(2)}
+                    </td>
+                    <td style="font-size: 10px; color: #666;">
+                        ${bar.score >= 0.6 ? '⚠️ HIGH' : bar.score >= 0.4 ? '⚡ MOD' : '✓ LOW'}
+                    </td>
+                </tr>`;
+            });
+            
+            html += '</table>';
+            el.innerHTML = html;
+        }
+        
+        // Fetch data from API
+        async function fetchData() {
+            try {
+                const resp = await fetch(`/api/exhaustion?symbol=${state.symbol}&timeframe=${state.timeframe}`);
+                const data = await resp.json();
+                updateUI(data);
+            } catch (e) {
+                console.log('API not available, using static data');
+                // Load static sample data for demo
+                loadSampleData();
+            }
+        }
+        
+        // Sample data for demo
+        function loadSampleData() {
+            const sample = {
+                latest: {
+                    score: 0.45,
+                    components: {
+                        delta_divergence: 0.52,
+                        volume_movement_ratio: 0.38,
+                        lingering: 0.41,
+                        delta_fade: 0.48
+                    },
+                    interpretation: 'MILD EXHAUSTION - Some stalling',
+                    bar_time: new Date().toISOString()
+                },
+                history: [],
+                bar_count: 0
+            };
+            
+            // Generate sample history
+            for (let i = 0; i < 30; i++) {
+                sample.history.push({
+                    bar_time: new Date(Date.now() - i * 5 * 60000).toISOString(),
+                    score: 0.2 + Math.random() * 0.6
+                });
+            }
+            sample.history.reverse();
+            
+            updateUI(sample);
+        }
+        
+        // Initialize
+        fetchData();
+        setInterval(fetchData, state.refreshInterval);
+        window.addEventListener('resize', renderChart);
+    </script>
+</body>
+</html>

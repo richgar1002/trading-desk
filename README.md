@@ -1,86 +1,179 @@
-# Trading Desk - Phase 1-3 Implementation
+# Orderflow Dashboard - Multi-Agent System
 
 ## Overview
 
-Built a complete trading system with Execution, Order Flow, and Session Intelligence modules.
+Multi-agent orderflow analysis system that measures various aspects of market microstructure and combines them for actionable signals.
 
-## Structure
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  DATA INPUT                                             │
+│  NinjaTrader CSV → SQLite Database                     │
+└────────────────────────┬────────────────────────────────┘
+                         │
+┌────────────────────────▼────────────────────────────────┐
+│  AGENT LAYER                                           │
+│  • Exhaustion Agent (measures buying without movement) │
+│  • Absorption Agent (measures large orders stalling)  │
+│  • Volume Agent (measures volume spikes)               │
+│  • Delta Agent (measures directional flow)             │
+│  • Liquidity Agent (measures stop runs)               │
+│  • Trend Agent (measures flow strength)               │
+│  • Footprint Agent (records volume at price levels)    │
+│  • Volume Profile Agent (records POC, VAL, VAH)      │
+│  • VWAP Agent (records VWAP deviations)               │
+└────────────────────────┬────────────────────────────────┘
+                         │
+┌────────────────────────▼────────────────────────────────┐
+│  SHARED DATABASE (SQLite)                              │
+│  All agents write scores with timestamps              │
+└────────────────────────┬────────────────────────────────┘
+                         │
+┌────────────────────────▼────────────────────────────────┐
+│  DASHBOARD                                             │
+│  Real-time HTML dashboard with alerts                  │
+└─────────────────────────────────────────────────────────┘
+```
+
+## Quick Start
+
+### 1. Setup
+
+```bash
+# Create sample data for testing
+cd /tmp/trading-desk
+python3 setup_sample_data.py
+
+# Start the dashboard
+cd dashboard
+python3 api_server.py
+```
+
+Open http://localhost:8080
+
+### 2. Import Your Data
+
+```bash
+# Import NinjaTrader CSV
+python3 agents/csv_importer.py /path/to/your/data.csv --symbol ES --timeframe 5min
+
+# Detect format first (dry run)
+python3 agents/csv_importer.py /path/to/your/data.csv --detect
+```
+
+### 3. Run Agents
+
+```bash
+# Calculate exhaustion for all bars
+python3 agents/exhaustion_agent.py --symbol ES --timeframe 5min --scan
+
+# Check specific bar
+python3 agents/exhaustion_agent.py --symbol ES --timeframe 5min --bar "2024-04-10 09:30"
+```
+
+### 4. View Dashboard
+
+Dashboard auto-refreshes every 10 seconds.
+
+Alerts trigger when exhaustion score >= 0.7
+
+## File Structure
 
 ```
 /tmp/trading-desk/
-├── execution/          # Phase 1: Order execution via NinjaTrader 8
-│   └── execution.py   # OrderExecutor, RiskManager
-├── orderflow/          # Phase 2: Tape analysis, delta, absorption
-│   └── orderflow.py   # OrderFlowAnalyzer
-├── session_intel/      # Phase 3: ICT methodology
-│   └── session_intel.py
-├── tools/              # OpenCode function tools
-│   ├── trading_tools.py
-│   └── opencode_trading_tools.json
-└── ninjatrader_bridge/ # Original NT8 bridge
+├── agents/
+│   ├── exhaustion_agent.py    # Exhaustion measurement
+│   ├── csv_importer.py        # NinjaTrader CSV import
+│   └── (future agents)
+├── database/
+│   ├── schema.sql             # Database structure
+│   └── orderflow.db           # SQLite database
+├── dashboard/
+│   ├── exhaustion_dashboard.html  # Main dashboard
+│   └── api_server.py          # REST API server
+├── data/
+│   └── sample/                # Sample data folder
+└── README.md
 ```
 
-## Tools Available
+## Database Schema
 
-### Execution
-- `execute_order` - Send orders to NinjaTrader
-- `get_connection_status` - Check NT8 connection
-- `connect_nt8` - Connect to NT8
-- `disconnect_nt8` - Disconnect
+### Tables
 
-### Order Flow
-- `analyze_order_flow` - Analyze tick for delta/absortion
-- `get_order_flow_summary` - Current session summary
-- `reset_order_flow` - Reset for new session
+- **bars** - OHLCV + bid/ask/delta per bar
+- **raw_footprint** - Raw price-level data from CSV
+- **agent_scores** - Agent measurements (agent_name, score, details)
+- **agents** - Registry of available agents
+- **imports** - Import tracking
+- **sessions** - Trading sessions
 
-### Session Intelligence (ICT)
-- `set_midnight_open` - Set midnight price
-- `record_session_range` - Record H/L for session
-- `add_liquidity_zone` - Track sweep zones
-- `detect_fvg` - Find Fair Value Gaps
-- `get_daily_bias` - ICT bias analysis
-- `get_trade_setup` - Get entry/stop/target
-- `check_sweeps` - Detect sweeps and FVG fills
-- `full_trade_analysis` - Complete analysis
+## NinjaTrader CSV Format
 
-## Usage with OpenCode
+Expected columns:
+- Time (required)
+- Price or Open/High/Low/Close
+- Bid Vol, Ask Vol (for footprint)
+- Delta (optional)
+- Total Volume
 
-1. Set environment:
-```bash
-export OPENROUTER_API_KEY="sk-or-v1-..."
+Example export from NinjaTrader:
+```
+Time,Price,Bid Vol,Ask Vol,Delta,Total Vol
+2024-04-10 09:30:00,5800.00,150,200,50,350
+...
 ```
 
-2. Run OpenCode with trading tools:
-```bash
-cd /tmp/trading-desk
-opencode --tools tools/trading_tools.py
+## Exhaustion Agent
+
+### What it measures
+
+**Score 0-1** (0 = directional move, 1 = full exhaustion)
+
+Components:
+- **Delta Divergence (35%)** - Price flat but high delta
+- **Volume/Movement Ratio (30%)** - High volume, low movement
+- **Lingering (20%)** - Price stuck at same level
+- **Delta Fade (15%)** - Delta high early, fading later
+
+### Interpretation
+
+| Score | Signal |
+|-------|--------|
+| 0.0-0.2 | NO EXHAUSTION - Directional intact |
+| 0.2-0.4 | LOW EXHAUSTION - Some pressure |
+| 0.4-0.6 | MILD EXHAUSTION - Watch for stalling |
+| 0.6-0.8 | MODERATE EXHAUSTION - Reversal possible |
+| 0.8-1.0 | STRONG EXHAUSTION - Reversal likely |
+
+## Adding More Agents
+
+Future agents follow the same pattern:
+
+```python
+class NewAgent:
+    name = "new_agent"
+    
+    def calculate_score(self, symbol, timeframe, bar_time) -> dict:
+        # Calculate score
+        return {"score": 0.5, "details": {...}}
+    
+    def score_all_bars(self, symbol, timeframe) -> list:
+        # Score all bars
+        return results
 ```
-
-3. Example prompts:
-- "Check connection to NinjaTrader"
-- "What's the daily bias for EUR/USD at 1.0850?"
-- "Give me a long setup if price is at 1.0920"
-- "Execute a BUY order for 1 lot of ES at market"
-
-## NinjaTrader 8 Setup
-
-1. Enable Desktop API in NT8:
-   - Tools > Options > API > Enable Desktop API
-   - Set port to 36973 (default)
-
-2. NT8 must be running on localhost for the VPS connection
-
-## Risk Management
-
-Built-in risk manager enforces:
-- Max $100 risk per trade (configurable)
-- Max $500 daily loss limit
-- Position size validation
-- Order validation before execution
 
 ## Next Steps
 
-1. Connect OpenCode to these tools
-2. Test with paper trading
-3. Add Telegram alerts for fills
-4. Build web dashboard
+1. Build Absorption Agent
+2. Add more data connectors (direct API)
+3. Build AI suggestion layer
+4. Add Supabase for cloud sync
+5. Build pattern correlation engine
+
+## Notes
+
+- Dashboard is HTML/JS, works in any browser
+- SQLite is file-based, portable
+- Agents run independently, can be parallelized
+- Scores stored with timestamps for historical analysis

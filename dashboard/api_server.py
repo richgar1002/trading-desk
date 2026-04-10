@@ -13,7 +13,7 @@ import sqlite3
 from urllib.parse import urlparse, parse_qs
 from datetime import datetime
 
-PORT = 8091
+PORT = 8095
 DB_PATH = "/tmp/trading-desk/database/orderflow.db"
 WWW_DIR = "/tmp/trading-desk/dashboard"
 
@@ -67,6 +67,12 @@ class OrderflowHandler(http.server.SimpleHTTPRequestHandler):
             self.handle_agents(conn)
         elif '/api/absorption' in path:
             self.handle_absorption(conn, symbol, timeframe)
+        elif '/api/volume' in path:
+            self.handle_volume(conn, symbol, timeframe)
+        elif '/api/delta' in path:
+            self.handle_delta(conn, symbol, timeframe)
+        elif '/api/liquidity' in path:
+            self.handle_liquidity(conn, symbol, timeframe)
         else:
             self.send_error(404)
         
@@ -185,6 +191,96 @@ class OrderflowHandler(http.server.SimpleHTTPRequestHandler):
             'history': history,
             'bar_count': len(history)
         })
+    
+    def handle_volume(self, conn, symbol, timeframe):
+        """Get volume data"""
+        cursor = conn.execute("""
+            SELECT bar_time, score, details FROM agent_scores
+            WHERE symbol = ? AND timeframe = ? AND agent_name = 'volume'
+            ORDER BY bar_time DESC LIMIT 5000
+        """, (symbol, timeframe))
+        rows = cursor.fetchall()
+        
+        history = []
+        for row in rows:
+            details = json.loads(row[2]) if row[2] else {}
+            history.append({
+                'bar_time': row[0], 'score': row[1],
+                'volume': details.get('volume', 0),
+                'components': details.get('components', {})
+            })
+        history.reverse()
+        
+        latest = history[-1] if history else None
+        if latest:
+            sys.path.insert(0, '/tmp/trading-desk')
+            from agents.volume_agent import VolumeAgent
+            agent = VolumeAgent(DB_PATH)
+            latest['interpretation'] = agent._interpret(latest['score'])
+        
+        self.send_json({'symbol': symbol, 'timeframe': timeframe, 'latest': latest, 'history': history, 'bar_count': len(history)})
+    
+    def handle_delta(self, conn, symbol, timeframe):
+        """Get delta data"""
+        cursor = conn.execute("""
+            SELECT bar_time, score, details FROM agent_scores
+            WHERE symbol = ? AND timeframe = ? AND agent_name = 'delta'
+            ORDER BY bar_time DESC LIMIT 5000
+        """, (symbol, timeframe))
+        rows = cursor.fetchall()
+        
+        history = []
+        for row in rows:
+            details = json.loads(row[2]) if row[2] else {}
+            history.append({
+                'bar_time': row[0], 'score': row[1],
+                'direction': details.get('direction', 'BALANCED'),
+                'delta_value': details.get('delta_value', 0),
+                'components': details.get('components', {})
+            })
+        history.reverse()
+        
+        latest = history[-1] if history else None
+        if latest:
+            sys.path.insert(0, '/tmp/trading-desk')
+            from agents.delta_agent import DeltaAgent
+            agent = DeltaAgent(DB_PATH)
+            latest['interpretation'] = agent._interpret(latest['score'], latest.get('delta_value', 0))
+        
+        self.send_json({'symbol': symbol, 'timeframe': timeframe, 'latest': latest, 'history': history, 'bar_count': len(history)})
+    
+    def handle_liquidity(self, conn, symbol, timeframe):
+        """Get liquidity data"""
+        cursor = conn.execute("""
+            SELECT bar_time, score, details FROM agent_scores
+            WHERE symbol = ? AND timeframe = ? AND agent_name = 'liquidity'
+            ORDER BY bar_time DESC LIMIT 5000
+        """, (symbol, timeframe))
+        rows = cursor.fetchall()
+        
+        history = []
+        for row in rows:
+            details = json.loads(row[2]) if row[2] else {}
+            history.append({
+                'bar_time': row[0], 'score': row[1],
+                'direction': details.get('direction', 'NEUTRAL'),
+                'components': details.get('components', {})
+            })
+        history.reverse()
+        
+        latest = history[-1] if history else None
+        if latest:
+            sys.path.insert(0, '/tmp/trading-desk')
+            from agents.liquidity_agent import LiquidityAgent
+            agent = LiquidityAgent(DB_PATH)
+            # Get bar data for interpretation
+            conn2 = sqlite3.connect(DB_PATH)
+            bar = agent._get_bar(conn2, symbol, timeframe, latest['bar_time'])
+            prev = agent._get_previous_bars(conn2, symbol, timeframe, latest['bar_time'], 20)
+            conn2.close()
+            latest['interpretation'] = agent._interpret(latest['score'], bar or {}, prev)
+        
+        self.send_json({'symbol': symbol, 'timeframe': timeframe, 'latest': latest, 'history': history, 'bar_count': len(history)})
     
     def send_json(self, data):
         """Send JSON response"""

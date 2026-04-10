@@ -13,7 +13,7 @@ import sqlite3
 from urllib.parse import urlparse, parse_qs
 from datetime import datetime
 
-PORT = 8095
+PORT = 8099
 DB_PATH = "/tmp/trading-desk/database/orderflow.db"
 WWW_DIR = "/tmp/trading-desk/dashboard"
 
@@ -73,6 +73,14 @@ class OrderflowHandler(http.server.SimpleHTTPRequestHandler):
             self.handle_delta(conn, symbol, timeframe)
         elif '/api/liquidity' in path:
             self.handle_liquidity(conn, symbol, timeframe)
+        elif '/api/trend' in path:
+            self.handle_trend(conn, symbol, timeframe)
+        elif '/api/volume_profile' in path:
+            self.handle_volume_profile(conn, symbol, timeframe)
+        elif '/api/vwap' in path:
+            self.handle_vwap(conn, symbol, timeframe)
+        elif '/api/footprint' in path:
+            self.handle_footprint(conn, symbol, timeframe)
         else:
             self.send_error(404)
         
@@ -280,6 +288,106 @@ class OrderflowHandler(http.server.SimpleHTTPRequestHandler):
             conn2.close()
             latest['interpretation'] = agent._interpret(latest['score'], bar or {}, prev)
         
+        self.send_json({'symbol': symbol, 'timeframe': timeframe, 'latest': latest, 'history': history, 'bar_count': len(history)})
+    
+    def handle_trend(self, conn, symbol, timeframe):
+        """Get trend data"""
+        cursor = conn.execute("""
+            SELECT bar_time, score, details FROM agent_scores
+            WHERE symbol = ? AND timeframe = ? AND agent_name = 'trend'
+            ORDER BY bar_time DESC LIMIT 5000
+        """, (symbol, timeframe))
+        rows = cursor.fetchall()
+        
+        history = []
+        for row in rows:
+            details = json.loads(row[2]) if row[2] else {}
+            history.append({
+                'bar_time': row[0], 'score': row[1],
+                'direction': details.get('direction', 'NEUTRAL'),
+                'components': details.get('components', {})
+            })
+        history.reverse()
+        
+        latest = history[-1] if history else None
+        if latest:
+            sys.path.insert(0, '/tmp/trading-desk')
+            from agents.trend_agent import TrendAgent
+            agent = TrendAgent(DB_PATH)
+            conn2 = sqlite3.connect(DB_PATH)
+            bar = agent._get_bar(conn2, symbol, timeframe, latest['bar_time'])
+            prev = agent._get_previous_bars(conn2, symbol, timeframe, latest['bar_time'], 30)
+            conn2.close()
+            latest['interpretation'] = agent._interpret(latest['score'], bar or {}, prev)
+        
+        self.send_json({'symbol': symbol, 'timeframe': timeframe, 'latest': latest, 'history': history, 'bar_count': len(history)})
+    
+    def handle_volume_profile(self, conn, symbol, timeframe):
+        """Get volume profile data"""
+        cursor = conn.execute("""
+            SELECT bar_time, poc, val, vah, vah_poc, val_poc, total_volume, details
+            FROM volume_profile WHERE symbol = ? AND timeframe = ?
+            ORDER BY bar_time DESC LIMIT 5000
+        """, (symbol, timeframe))
+        rows = cursor.fetchall()
+        
+        history = []
+        for row in rows:
+            details = json.loads(row[7]) if row[7] else {}
+            history.append({
+                'bar_time': row[0], 'poc': row[1], 'val': row[2], 'vah': row[3],
+                'vah_poc': row[4], 'val_poc': row[5], 'total_volume': row[6],
+                'interpretation': details.get('interpretation', ''),
+                'direction': details.get('direction', 'NEUTRAL')
+            })
+        history.reverse()
+        
+        latest = history[-1] if history else None
+        self.send_json({'symbol': symbol, 'timeframe': timeframe, 'latest': latest, 'history': history, 'bar_count': len(history)})
+    
+    def handle_vwap(self, conn, symbol, timeframe):
+        """Get VWAP data"""
+        cursor = conn.execute("""
+            SELECT bar_time, vwap, deviation_points, deviation_pct, direction, details
+            FROM vwap_data WHERE symbol = ? AND timeframe = ?
+            ORDER BY bar_time DESC LIMIT 5000
+        """, (symbol, timeframe))
+        rows = cursor.fetchall()
+        
+        history = []
+        for row in rows:
+            details = json.loads(row[5]) if row[5] else {}
+            history.append({
+                'bar_time': row[0], 'vwap': row[1], 'deviation_points': row[2],
+                'deviation_pct': row[3], 'direction': row[4],
+                'score': details.get('score', 0),
+                'interpretation': details.get('interpretation', '')
+            })
+        history.reverse()
+        
+        latest = history[-1] if history else None
+        self.send_json({'symbol': symbol, 'timeframe': timeframe, 'latest': latest, 'history': history, 'bar_count': len(history)})
+    
+    def handle_footprint(self, conn, symbol, timeframe):
+        """Get footprint analysis"""
+        sys.path.insert(0, '/tmp/trading-desk')
+        from agents.footprint_agent import FootprintAgent
+        agent = FootprintAgent(DB_PATH)
+        
+        cursor = conn.execute("""
+            SELECT DISTINCT bar_time FROM raw_footprint
+            WHERE symbol = ? AND timeframe = ?
+            ORDER BY bar_time DESC LIMIT 100
+        """, (symbol, timeframe))
+        bar_times = [row[0] for row in cursor.fetchall()]
+        
+        history = []
+        for bar_time in bar_times:
+            result = agent.analyze_footprint(symbol, timeframe, bar_time)
+            history.append(result)
+        history.reverse()
+        
+        latest = history[-1] if history else None
         self.send_json({'symbol': symbol, 'timeframe': timeframe, 'latest': latest, 'history': history, 'bar_count': len(history)})
     
     def send_json(self, data):

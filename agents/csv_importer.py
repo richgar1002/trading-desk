@@ -48,18 +48,19 @@ class CSVImporter:
             "column_map": {}
         }
         
-        # Map common column names
+        # Map common column names (NinjaTrader specific)
         column_mapping = {
             "time": ["time", "datetime", "date", "timestamp", "bar time"],
             "price": ["price", "last", "close"],
-            "bid_vol": ["bid vol", "bid volume", "sell vol", "selling volume"],
-            "ask_vol": ["ask vol", "ask volume", "buy vol", "buying volume"],
-            "delta": ["delta", "net delta", "cum delta"],
-            "total_vol": ["total vol", "total volume", "volume", "vol"],
+            "bid_vol": ["bid vol", "bid volume", "sell vol", "selling volume", "bidvolume", "bid volume"],
+            "ask_vol": ["ask vol", "ask volume", "buy vol", "buying volume", "askvolume", "ask volume"],
+            "delta": ["delta", "net delta", "cum delta", "cumulateddelta"],
+            "total_vol": ["total vol", "total volume", "volume", "vol", "totalvolume"],
             "open": ["open", "o"],
             "high": ["high", "h"],
             "low": ["low", "l"],
-            "close": ["close", "c"]
+            "close": ["close", "c"],
+            "bar_index": ["barindex", "bar index", "index"]
         }
         
         for standard_name, aliases in column_mapping.items():
@@ -69,11 +70,13 @@ class CSVImporter:
                     break
         
         # Detect if footprint (has price level data) or bar data
-        if "price" in format_info["column_map"] and "bid_vol" in format_info["column_map"]:
+        # Bars = has OHLC columns
+        if "open" in format_info["column_map"] and "close" in format_info["column_map"]:
+            format_info["type"] = "bars"
+            format_info["has_footprint"] = False
+        elif "price" in format_info["column_map"] and "bid_vol" in format_info["column_map"]:
             format_info["has_footprint"] = True
             format_info["type"] = "footprint"
-        elif "open" in format_info["column_map"] and "close" in format_info["column_map"]:
-            format_info["type"] = "bars"
         
         return format_info
     

@@ -8,11 +8,12 @@ import http.server
 import socketserver
 import json
 import os
+import sys
 import sqlite3
 from urllib.parse import urlparse, parse_qs
 from datetime import datetime
 
-PORT = 8080
+PORT = 8091
 DB_PATH = "/tmp/trading-desk/database/orderflow.db"
 WWW_DIR = "/tmp/trading-desk/dashboard"
 
@@ -64,6 +65,8 @@ class OrderflowHandler(http.server.SimpleHTTPRequestHandler):
             self.handle_bars(conn, symbol, timeframe)
         elif '/api/agents' in path:
             self.handle_agents(conn)
+        elif '/api/absorption' in path:
+            self.handle_absorption(conn, symbol, timeframe)
         else:
             self.send_error(404)
         
@@ -75,7 +78,7 @@ class OrderflowHandler(http.server.SimpleHTTPRequestHandler):
             SELECT bar_time, score, details FROM agent_scores
             WHERE symbol = ? AND timeframe = ? AND agent_name = 'exhaustion'
             ORDER BY bar_time DESC
-            LIMIT 100
+            LIMIT 5000
         """, (symbol, timeframe))
         rows = cursor.fetchall()
         
@@ -95,6 +98,7 @@ class OrderflowHandler(http.server.SimpleHTTPRequestHandler):
         
         latest = history[-1] if history else None
         if latest:
+            sys.path.insert(0, '/tmp/trading-desk')
             from agents.exhaustion_agent import ExhaustionAgent
             agent = ExhaustionAgent(DB_PATH)
             interp = agent._interpret(latest['score'])
@@ -140,6 +144,47 @@ class OrderflowHandler(http.server.SimpleHTTPRequestHandler):
         rows = cursor.fetchall()
         agents = [{'name': r[0], 'description': r[1], 'enabled': bool(r[2])} for r in rows]
         self.send_json({'agents': agents})
+    
+    def handle_absorption(self, conn, symbol, timeframe):
+        """Get absorption data"""
+        cursor = conn.execute("""
+            SELECT bar_time, score, details FROM agent_scores
+            WHERE symbol = ? AND timeframe = ? AND agent_name = 'absorption'
+            ORDER BY bar_time DESC
+            LIMIT 5000
+        """, (symbol, timeframe))
+        rows = cursor.fetchall()
+        
+        history = []
+        for row in rows:
+            try:
+                details = json.loads(row[2]) if row[2] else {}
+            except:
+                details = {}
+            history.append({
+                'bar_time': row[0],
+                'score': row[1],
+                'direction': details.get('direction', 'NEUTRAL'),
+                'components': details.get('components', {})
+            })
+        
+        history.reverse()
+        
+        latest = history[-1] if history else None
+        if latest:
+            sys.path.insert(0, '/tmp/trading-desk')
+            from agents.absorption_agent import AbsorptionAgent
+            agent = AbsorptionAgent(DB_PATH)
+            interp = agent._interpret(latest['score'])
+            latest['interpretation'] = interp
+        
+        self.send_json({
+            'symbol': symbol,
+            'timeframe': timeframe,
+            'latest': latest,
+            'history': history,
+            'bar_count': len(history)
+        })
     
     def send_json(self, data):
         """Send JSON response"""
